@@ -1,0 +1,21 @@
+﻿Build started 09.11.2015 19:30:48.
+     1>Project "C:\Users\Peter Mortimer\Documents\WinterSemester2015\WiSe2015-Game Physics\Exercise1\Template_GamePhysics\DXUT11\Core\DXUT_DirectXTK_2013.vcxproj" on node 4 (Build target(s)).
+     1>ClCompile:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\CL.exe /c /I..\..\DirectXTK\Inc /Zi /nologo /W4 /WX- /Od /Oi /D WIN32 /D _DEBUG /D DEBUG /D PROFILE /D _WINDOWS /D _LIB /D USE_DIRECTXTK /D USE_DIRECT3D11_2 /D _WIN32_WINNT=0x0600 /D _UNICODE /D UNICODE /Gm- /EHsc /RTC1 /MDd /GS /fp:fast /Zc:wchar_t /Zc:forScope /openmp- /Yc"DXUT.h" /Fp"Bin\DirectXTK_2013\x64\Debug\DXUT.pch" /Fo"Bin\DirectXTK_2013\x64\Debug\\" /Fd"Bin\DirectXTK_2013\x64\Debug\DXUT.pdb" /Gd /TP /errorReport:prompt  DXUT.cpp
+         DXUT.cpp
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\CL.exe /c /I..\..\DirectXTK\Inc /Zi /nologo /W4 /WX- /Od /Oi /D WIN32 /D _DEBUG /D DEBUG /D PROFILE /D _WINDOWS /D _LIB /D USE_DIRECTXTK /D USE_DIRECT3D11_2 /D _WIN32_WINNT=0x0600 /D _UNICODE /D UNICODE /Gm- /EHsc /RTC1 /MDd /GS /fp:fast /Zc:wchar_t /Zc:forScope /openmp- /Yu"DXUT.h" /Fp"Bin\DirectXTK_2013\x64\Debug\DXUT.pch" /Fo"Bin\DirectXTK_2013\x64\Debug\\" /Fd"Bin\DirectXTK_2013\x64\Debug\DXUT.pdb" /Gd /TP /errorReport:prompt  DXUTDevice11.cpp DXUTmisc.cpp DXErr.cpp
+         DXUTDevice11.cpp
+         DXUTmisc.cpp
+         DXErr.cpp
+         Generating Code...
+       Lib:
+         C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\x86_amd64\Lib.exe /OUT:"Bin\DirectXTK_2013\x64\Debug\DXUT.lib" /NOLOGO /MACHINE:X64 Bin\DirectXTK_2013\x64\Debug\DXUT.obj
+         Bin\DirectXTK_2013\x64\Debug\DXUTDevice11.obj
+         Bin\DirectXTK_2013\x64\Debug\DXUTmisc.obj
+         Bin\DirectXTK_2013\x64\Debug\DXErr.obj
+         DXUT_DirectXTK_2013.vcxproj -> C:\Users\Peter Mortimer\Documents\WinterSemester2015\WiSe2015-Game Physics\Exercise1\Template_GamePhysics\DXUT11\Core\Bin\DirectXTK_2013\x64\Debug\DXUT.lib
+     1>Done Building Project "C:\Users\Peter Mortimer\Documents\WinterSemester2015\WiSe2015-Game Physics\Exercise1\Template_GamePhysics\DXUT11\Core\DXUT_DirectXTK_2013.vcxproj" (Build target(s)).
+
+Build succeeded.
+
+Time Elapsed 00:00:26.50
