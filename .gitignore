@@ -287,3 +287,8 @@ _Pvt_Extensions
 *.exe
 *.out
 *.app
+
+#suggested in GED assignment00
+*.tlog
+*.idb
+*.pch
