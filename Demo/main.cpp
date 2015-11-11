@@ -147,6 +147,7 @@ void DrawBoundingBox(ID3D11DeviceContext* pd3dImmediateContext)
     // Draw
     g_pPrimitiveBatchPositionColor->Begin();
     
+	//hello
     // Lines in x direction (red color)
     for (int i=0; i<4; i++)
     {
