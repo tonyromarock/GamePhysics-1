@@ -93,13 +93,17 @@ bool  g_bDrawTriangle  = true;
 bool  g_bDrawSpheres = true;
 // added
 bool	g_bMidpoint = true; // if false: then Euler
+bool	g_bDrawSprings = true;
+bool	g_bDrawPoints = true;
 
 float	h_timeStep = 0.1f;
 float	point_mass = 10.0f;
 
 
-// added functions
+// added functions (Peter)
 float getDistance(XMVECTOR* p, XMVECTOR* q);
+void nextStep(float h_timeStep);
+void massSpringInitialization();
 
 #endif
 //#ifdef MASS_SPRING_SYSTEM
@@ -197,6 +201,48 @@ point* addPoint(float x, float y, float z, bool fixed)
 	return p;
 }
 
+void nextStep(float timestep)
+{
+	for each (auto point in points)
+	{
+		point->clearForces();
+	}
+
+	if (g_bMidpoint) 
+	{
+		// do midpoint here...
+	}
+	else 
+	{
+		// doing Euler here
+		for each (auto spring in springs)
+		{
+			// TODO: compute elastic forces here
+		}
+		for each (auto point in points) 
+		{
+			if (point->fixed){ continue; }
+
+			XMVECTOR totalForce = XMVectorAdd(point->ext_F, point->int_F);
+
+			point->coords += XMVectorScale(point->curr_v, timestep);
+			point->curr_v += XMVectorScale(point->curr_v, timestep / point_mass);
+		}
+
+	}
+
+	// Position correction if z < 0
+	for each(auto point in points) 
+	{
+		if (point->fixed){ continue; }
+
+		if (XMVectorGetByIndex(point->coords, 2) < 0) 
+		{
+			XMVectorSetByIndex(point->coords, 0, 2);
+		}
+	}
+}
+
 // Video recorder
 FFmpeg* g_pFFmpegVideoRecorder = nullptr;
 
@@ -228,6 +274,10 @@ void InitTweakBar(ID3D11Device* pd3dDevice)
 	case 2:
 		TwAddVarRW(g_pTweakBar, "Draw Triangle", TW_TYPE_BOOLCPP, &g_bDrawTriangle, "");
 		break;
+	case 4:
+		TwAddVarRW(g_pTweakBar, "Midpoint", TW_TYPE_BOOLCPP, &g_bMidpoint, "");
+		TwAddVarRW(g_pTweakBar, "Draw Points", TW_TYPE_BOOLCPP, &g_bDrawPoints, "");
+		TwAddVarRW(g_pTweakBar, "Draw Springs", TW_TYPE_BOOLCPP, &g_bDrawSprings, "");
 	default:
 		break;
 	}
@@ -397,6 +447,71 @@ void DrawTriangle(ID3D11DeviceContext* pd3dImmediateContext)
 #endif
 
 //#ifdef MASS_SPRING_SYSTEM
+
+void drawPoints(ID3D11DeviceContext* pd3dImmediateContext) 
+{
+	g_pEffectPositionNormal->SetEmissiveColor(Colors::Black);
+	g_pEffectPositionNormal->SetSpecularColor(0.4f * Colors::White);
+	g_pEffectPositionNormal->SetSpecularPower(100);
+
+	std::mt19937 eng;
+	std::uniform_real_distribution<float> randCol(0.0f, 1.0f);
+	std::uniform_real_distribution<float> randPos(-0.5f, 0.5f);
+
+	for (int i = 0; i < points.size(); i++) 
+	{
+		g_pEffectPositionNormal->SetDiffuseColor(0.6f * XMColorHSVToRGB(XMVectorSet(0, 0, 1, 0)));
+		XMMATRIX scale = XMMatrixScaling(0.11f, 0.11f, 0.11f);
+		XMMATRIX trans = XMMatrixTranslation(XMVectorGetByIndex(points[i]->coords, 0), XMVectorGetByIndex(points[i]->coords, 1), XMVectorGetByIndex(points[i]->coords, 2));
+		g_pEffectPositionNormal->SetWorld(scale * trans * g_camera.GetWorldMatrix());
+
+		// draw
+		g_pSphere->Draw(g_pEffectPositionNormal, g_pInputLayoutPositionNormal);
+	}
+
+}
+
+void drawSprings(ID3D11DeviceContext* pd3dImmediateContext)
+{
+	g_pEffectPositionColor->SetWorld(g_camera.GetWorldMatrix());
+
+	g_pEffectPositionColor->Apply(pd3dImmediateContext);
+	pd3dImmediateContext->IASetInputLayout(g_pInputLayoutPositionColor);
+
+	// draw (similar as for the bounding box)
+	g_pPrimitiveBatchPositionColor->Begin();
+	for (int i = 0; i < springs.size(); i++) 
+	{
+		g_pPrimitiveBatchPositionColor->DrawLine(
+			VertexPositionColor(springs[i]->point1->coords, Colors::Green),
+			VertexPositionColor(springs[i]->point2->coords, Colors::Green)
+			);
+	}
+	g_pPrimitiveBatchPositionColor->End();
+}
+
+void massSpringInitialization() 
+{
+	// delete old points/springs
+	for each(auto point in points) { delete point;	}
+	for each(auto spring in springs) { delete spring; }
+	points.clear();
+	springs.clear();
+
+	point* p0 = addPoint(0.f, 0.f, 0.f, false);
+	point* p1 = addPoint(0.f, 2.f, 0.f, false);
+
+	p0->curr_v = XMVectorSet(-1.f, 0.f, 0.f, 0.f);
+	p1->curr_v = XMVectorSet(1.f, 0.f, 0.f, 0.f);
+
+
+	spring* s0 = addSpring(p0, p1, 1);
+	s0->stiffness = 40;
+
+	point_mass = 10.f;
+
+}
+
 //void DrawMassSpringSystem(ID3D11DeviceContext* pd3dImmediateContext)
 //#endif
 // ============================================================
@@ -542,6 +657,15 @@ void CALLBACK OnD3D11DestroyDevice( void* pUserContext )
     SAFE_DELETE (g_pPrimitiveBatchPositionNormalColor);
     SAFE_RELEASE(g_pInputLayoutPositionNormalColor);
     SAFE_DELETE (g_pEffectPositionNormalColor);
+
+	for each (auto point in points)
+	{
+		delete point;
+	}
+	for each (auto spring in springs)
+	{
+		delete spring;
+	}
 }
 
 //--------------------------------------------------------------------------------------
@@ -681,6 +805,8 @@ void CALLBACK OnFrameMove(double dTime, float fElapsedTime, void* pUserContext)
 {
 	UpdateWindowTitle(L"Demo");
 
+	static float time_counter = 0;
+
 	// Move camera
 	g_camera.FrameMove(fElapsedTime);
 
@@ -769,6 +895,14 @@ void CALLBACK OnFrameMove(double dTime, float fElapsedTime, void* pUserContext)
 		if (g_vfRotate.z > 2 * M_PI) g_vfRotate.z -= 2 * M_PI;
 
 		break;
+	case 4:
+		time_counter += fElapsedTime;
+		if (time_counter > h_timeStep) 
+		{
+			nextStep(h_timeStep);
+			time_counter -= h_timeStep;
+		}
+		break;
 	default:
 		break;
 	}
@@ -817,12 +951,18 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		// Draw simple triangle
 		if (g_bDrawTriangle) DrawTriangle(pd3dImmediateContext);
 		break;
+	case 4:
+		// Draw Mass-Spring Setup
+		if (g_bDrawPoints) { drawPoints(pd3dImmediateContext); }
+		if (g_bDrawSprings) { drawSprings(pd3dImmediateContext); }
 	default:
 		break;
 	}
 #endif
     
 //#ifdef MASS_SPRING_SYSTEM
+
+
 //#endif
 
     // Draw GUI
@@ -877,6 +1017,8 @@ int main(int argc, char* argv[])
 	DXUTSetCursorSettings( true, true ); // Show the cursor and clip it when in full screen
 	DXUTCreateWindow( L"Demo" );
 	DXUTCreateDevice( D3D_FEATURE_LEVEL_11_0, true, 1280, 960 );
+
+	massSpringInitialization();
     
 	DXUTMainLoop(); // Enter into the DXUT render loop
 
