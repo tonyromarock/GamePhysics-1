@@ -91,9 +91,111 @@ float g_fSphereSize    = 0.05f;
 bool  g_bDrawTeapot    = true;
 bool  g_bDrawTriangle  = true;
 bool  g_bDrawSpheres = true;
+// added
+bool	g_bMidpoint = true; // if false: then Euler
+
+float	h_timeStep = 0.1f;
+float	point_mass = 10.0f;
+
+
+// added functions
+float getDistance(XMVECTOR* p, XMVECTOR* q);
+
 #endif
 //#ifdef MASS_SPRING_SYSTEM
 //#endif
+
+// Using structs instead of separate classes for mass point and springs (Peter)
+struct point
+{
+	bool fixed; 
+	XMVECTOR coords;
+	XMVECTOR int_F = XMVectorSet(0.f, 0.f, 0.f, 0.f);
+	XMVECTOR ext_F = XMVectorSet(0.f, 0.f, 0.f, 0.f);
+	XMVECTOR curr_x;
+	XMVECTOR curr_v = XMVectorSet(0.f, 0.f, 0.f, 0.f);
+
+	// constructor
+	point(bool fixed, XMVECTOR &coords) : coords(coords), fixed(fixed)
+	{
+		curr_x = coords;
+	}
+
+	// adding vec onto internal Force
+	void addIntF(XMVECTOR vec)
+	{
+		int_F += vec;
+	}
+
+	void addExtF(XMVECTOR vec) 
+	{
+		ext_F += vec;
+	}
+
+	void clearForces()
+	{
+		int_F = XMVectorSet(0.f, 0.f, 0.f, 0.f);
+		ext_F = XMVectorSet(0.f, 0.f, 0.f, 0.f);
+	}
+};
+
+float getDistance(XMVECTOR* p, XMVECTOR* q) 
+{
+	XMVECTOR diff = *p - *q;
+	diff = XMVector3Length(diff); // see doc: solution written in each component
+	return XMVectorGetByIndex(diff, 0);
+}
+
+// struct for spring
+struct spring
+{
+	point* point1;
+	point* point2;
+	float org_length;
+	float stiffness;
+	XMVECTOR forces = XMVectorSet(0.f, 0.f, 0.f, 0.f);
+
+	// constructors
+
+	// here spring is idle, since spring original length equals the distance
+	spring(point* point1, point* point2) : point1(point1), point2(point2)
+	{
+		org_length = getDistance(&point1->coords, &point2->coords);
+	}
+
+	spring(point* point1, point* point2, float o_length) : point1(point1), point2(point2), org_length(o_length)
+	{
+	}
+
+};
+
+// lists with points and springs
+std::vector<point*> points;
+std::vector<spring*> springs;
+
+spring* addSpring(point* a, point* b) 
+{
+	spring* s = new spring(a, b);
+	springs.push_back(s);
+
+	return s;
+}
+
+spring* addSpring(point* a, point* b, float org_length)
+{
+	spring* s = new spring(a, b, org_length);
+	springs.push_back(s);
+
+	return s;
+}
+
+point* addPoint(float x, float y, float z, bool fixed) 
+{
+	point* p = new point(fixed, XMVectorSet(x, y, z, 0.f));
+	points.push_back(p);
+
+	return p;
+}
 
 // Video recorder
 FFmpeg* g_pFFmpegVideoRecorder = nullptr;
@@ -104,7 +206,7 @@ void InitTweakBar(ID3D11Device* pd3dDevice)
     g_pTweakBar = TwNewBar("TweakBar");
 	TwDefine(" TweakBar color='0 128 128' alpha=128 ");
 
-	TwType TW_TYPE_TESTCASE = TwDefineEnumFromString("Test Scene", "BasicTest,Setup1,Setup2,Setup3");
+	TwType TW_TYPE_TESTCASE = TwDefineEnumFromString("Test Scene", "BasicTest,Setup1,Setup2,Setup3,Demo1");
 	TwAddVarRW(g_pTweakBar, "Test Scene", TW_TYPE_TESTCASE, &g_iTestCase, "");
 	// HINT: For buttons you can directly pass the callback function as a lambda expression.
 	TwAddButton(g_pTweakBar, "Reset Scene", [](void *){g_iPreTestCase = -1; }, nullptr, "");
@@ -609,13 +711,16 @@ void CALLBACK OnFrameMove(double dTime, float fElapsedTime, void* pUserContext)
 			break;
 		case 1:
 			cout << "Test1!\n";
-			g_bDrawTeapot = true;			
+			g_bDrawTeapot = true;
 			g_vfMovableObjectPos = XMFLOAT3(0, 0, 0);
 			g_vfRotate = XMFLOAT3(0, 0, 0);
 			break;
 		case 2:
 			cout << "Test2!\n";
 			g_bDrawTriangle = true;
+			break;
+		case 4:
+			cout << "Demo 1!\n";
 			break;
 		default:
 			cout << "Empty Test!\n";
