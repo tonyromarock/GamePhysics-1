@@ -117,13 +117,15 @@ struct point
 	XMVECTOR coords;
 	XMVECTOR int_F = XMVectorSet(0.f, 0.f, 0.f, 0.f);
 	XMVECTOR ext_F = XMVectorSet(0.f, 0.f, 0.f, 0.f);
-	XMVECTOR curr_x;
-	XMVECTOR curr_v = XMVectorSet(0.f, 0.f, 0.f, 0.f);
+	XMVECTOR curr_v = XMVectorSet(0.f, 0.f, 0.f, 0.f);	// current velocity
+	// for midpoint xtmp and vtmp
+	XMVECTOR xtmp;
+	XMVECTOR vtmp = XMVectorSet(0.f, 0.f, 0.f, 0.f);
 
 	// constructor
 	point(bool fixed, XMVECTOR &coords) : coords(coords), fixed(fixed)
 	{
-		curr_x = coords;
+		xtmp = coords;
 	}
 
 	// adding vec onto internal Force
@@ -172,16 +174,29 @@ struct spring
 	{
 	}
 
-	void computeSpringForces() 
+	void computeSpringForces()
 	{
 		float curr_length = getDistance(&point1->coords, &point2->coords);
 		float springForce = (-1 * stiffness) * (curr_length - org_length);
 		forces = XMVectorSubtract(point1->coords, point2->coords);
-		forces = XMVectorScale(forces, 1.f/curr_length);
+		forces = XMVectorScale(forces, 1.f / curr_length);
 		forces = XMVectorScale(forces, springForce);
 
 		point1->addIntF(forces);
-		point2->addIntF(XMVectorScale(forces,-1.f));
+		point2->addIntF(XMVectorScale(forces, -1.f));
+	}
+
+	// same only with xtmp 
+	void computeSpringForcesTMP()
+	{
+		float curr_length = getDistance(&point1->xtmp, &point2->xtmp);
+		float springForce = (-1 * stiffness) * (curr_length - org_length);
+		forces = XMVectorSubtract(point1->xtmp, point2->xtmp);
+		forces = XMVectorScale(forces, 1.f / curr_length);
+		forces = XMVectorScale(forces, springForce);
+
+		point1->addIntF(forces);
+		point2->addIntF(XMVectorScale(forces, -1.f));
 	}
 
 	void addDamping()
@@ -193,8 +208,15 @@ struct spring
 		point2->addIntF(dampPoint2);
 	}
 
+	// same with vtmp
+	void addDampingTMP()
+	{
+		XMVECTOR dampPoint1 = XMVectorScale(point1->vtmp, -g_fDamping);
+		XMVECTOR dampPoint2 = XMVectorScale(point2->vtmp, -g_fDamping);
 
-
+		point1->addIntF(dampPoint1);
+		point2->addIntF(dampPoint2);
+	}
 
 };
 
@@ -235,7 +257,51 @@ void nextStep(float timestep)
 
 	if (g_bMidpoint) 
 	{
-		// do midpoint here...
+		// (steps on slide 71 of mass-spring slides)
+		float half_timestep = timestep / 2.f;
+
+		for each (auto point in points) 
+		{
+			if (point->fixed){ continue; }
+
+			point->xtmp = XMVectorAdd(point->coords, XMVectorScale(point->curr_v, half_timestep));	// Step 2
+
+		}
+
+		for each (auto spring in springs) 
+		{
+			// Step 3
+			spring->computeSpringForces();
+			spring->addDamping();
+		}
+
+		for each (auto point in points)
+		{
+			if (point->fixed){ continue; }
+
+			// Step 4
+			XMVECTOR totalForce = XMVectorAdd(point->ext_F, point->int_F);
+			point->vtmp = point->curr_v + half_timestep * (totalForce / point_mass);
+
+			point->coords += timestep * point->vtmp;	// Step 5
+		}
+
+		for each (auto spring in springs)
+		{
+			// Step 6
+			spring->computeSpringForcesTMP();
+			spring->addDampingTMP();
+		}
+
+		for each(auto point in points) 
+		{
+			if (point->fixed) { continue; }
+			
+			// Step 7
+			XMVECTOR totalForce = XMVectorAdd(point->ext_F, point->int_F);
+			point->curr_v += half_timestep * (totalForce / point_mass);
+		}
+		
 	}
 	else 
 	{
@@ -305,6 +371,10 @@ void InitTweakBar(ID3D11Device* pd3dDevice)
 		TwAddVarRW(g_pTweakBar, "Draw Points", TW_TYPE_BOOLCPP, &g_bDrawPoints, "");
 		TwAddVarRW(g_pTweakBar, "Draw Springs", TW_TYPE_BOOLCPP, &g_bDrawSprings, "");
 		TwAddVarRW(g_pTweakBar, "Damping", TW_TYPE_FLOAT, &g_fDamping, "min=0.00 step=0.01");
+		TwAddButton(g_pTweakBar, "Reset Simulation", [](void*)
+		{
+			massSpringInitialization();
+		}, nullptr, "");
 	default:
 		break;
 	}
