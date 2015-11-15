@@ -95,6 +95,7 @@ bool  g_bDrawSpheres = true;
 bool	g_bMidpoint = true; // if false: then Euler
 bool	g_bDrawSprings = true;
 bool	g_bDrawPoints = true;
+float	g_fDamping = 4.0f;
 
 float	h_timeStep = 0.1f;
 float	point_mass = 10.0f;
@@ -102,7 +103,7 @@ float	point_mass = 10.0f;
 
 // added functions (Peter)
 float getDistance(XMVECTOR* p, XMVECTOR* q);
-void nextStep(float h_timeStep);
+void nextStep(float timeStep);
 void massSpringInitialization();
 
 #endif
@@ -162,14 +163,38 @@ struct spring
 	// constructors
 
 	// here spring is idle, since spring original length equals the distance
-	spring(point* point1, point* point2) : point1(point1), point2(point2)
+	spring(point* point1, point* point2, float stiffness) : point1(point1), point2(point2), stiffness(stiffness)
 	{
 		org_length = getDistance(&point1->coords, &point2->coords);
 	}
 
-	spring(point* point1, point* point2, float o_length) : point1(point1), point2(point2), org_length(o_length)
+	spring(point* point1, point* point2, float o_length, float stiffness) : point1(point1), point2(point2), org_length(o_length), stiffness(stiffness)
 	{
 	}
+
+	void computeSpringForces() 
+	{
+		float curr_length = getDistance(&point1->coords, &point2->coords);
+		float springForce = (-1 * stiffness) * (curr_length - org_length);
+		forces = XMVectorSubtract(point1->coords, point2->coords);
+		forces = XMVectorScale(forces, 1.f/curr_length);
+		forces = XMVectorScale(forces, springForce);
+
+		point1->addIntF(forces);
+		point2->addIntF(XMVectorScale(forces,-1.f));
+	}
+
+	void addDamping()
+	{
+		XMVECTOR dampPoint1 = XMVectorScale(point1->curr_v, -g_fDamping);
+		XMVECTOR dampPoint2 = XMVectorScale(point2->curr_v, -g_fDamping);
+
+		point1->addIntF(dampPoint1);
+		point2->addIntF(dampPoint2);
+	}
+
+
+
 
 };
 
@@ -177,17 +202,17 @@ struct spring
 std::vector<point*> points;
 std::vector<spring*> springs;
 
-spring* addSpring(point* a, point* b) 
+spring* addSpring(point* a, point* b, float stiffness) 
 {
-	spring* s = new spring(a, b);
+	spring* s = new spring(a, b, stiffness);
 	springs.push_back(s);
 
 	return s;
 }
 
-spring* addSpring(point* a, point* b, float org_length)
+spring* addSpring(point* a, point* b, float org_length, float stiffness)
 {
-	spring* s = new spring(a, b, org_length);
+	spring* s = new spring(a, b, org_length, stiffness);
 	springs.push_back(s);
 
 	return s;
@@ -217,7 +242,8 @@ void nextStep(float timestep)
 		// doing Euler here
 		for each (auto spring in springs)
 		{
-			// TODO: compute elastic forces here
+			spring->computeSpringForces();
+			spring->addDamping();
 		}
 		for each (auto point in points) 
 		{
@@ -226,7 +252,7 @@ void nextStep(float timestep)
 			XMVECTOR totalForce = XMVectorAdd(point->ext_F, point->int_F);
 
 			point->coords += XMVectorScale(point->curr_v, timestep);
-			point->curr_v += XMVectorScale(point->curr_v, timestep / point_mass);
+			point->curr_v += XMVectorScale(totalForce, timestep / point_mass);
 		}
 
 	}
@@ -278,6 +304,7 @@ void InitTweakBar(ID3D11Device* pd3dDevice)
 		TwAddVarRW(g_pTweakBar, "Midpoint", TW_TYPE_BOOLCPP, &g_bMidpoint, "");
 		TwAddVarRW(g_pTweakBar, "Draw Points", TW_TYPE_BOOLCPP, &g_bDrawPoints, "");
 		TwAddVarRW(g_pTweakBar, "Draw Springs", TW_TYPE_BOOLCPP, &g_bDrawSprings, "");
+		TwAddVarRW(g_pTweakBar, "Damping", TW_TYPE_FLOAT, &g_fDamping, "min=0.00 step=0.01");
 	default:
 		break;
 	}
@@ -505,8 +532,7 @@ void massSpringInitialization()
 	p1->curr_v = XMVectorSet(1.f, 0.f, 0.f, 0.f);
 
 
-	spring* s0 = addSpring(p0, p1, 1);
-	s0->stiffness = 40;
+	spring* s0 = addSpring(p0, p1, 1, 40);
 
 	point_mass = 10.f;
 
