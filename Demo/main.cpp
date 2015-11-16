@@ -96,15 +96,19 @@ bool	g_bMidpoint = true; // if false: then Euler
 bool	g_bDrawSprings = true;
 bool	g_bDrawPoints = true;
 float	g_fDamping = 4.0f;
+bool	g_bGravityOn = false;
 
 float	h_timeStep = 0.1f;
 float	point_mass = 10.0f;
+float	GravityConst = -9.81;
+float		gravMulti = 0.2;
 
 
 // added functions (Peter)
 float getDistance(XMVECTOR* p, XMVECTOR* q);
 void nextStep(float timeStep);
 void massSpringInitialization();
+void SpringHouseInitialization();
 
 #endif
 //#ifdef MASS_SPRING_SYSTEM
@@ -137,6 +141,14 @@ struct point
 	void addExtF(XMVECTOR vec) 
 	{
 		ext_F += vec;
+	}
+
+	void addGravity()
+	{
+		if (g_bGravityOn)
+		{
+			this->addExtF(XMVectorSet(0.f, point_mass * GravityConst * gravMulti, 0.f, 0.f));
+		}
 	}
 
 	void clearForces()
@@ -272,7 +284,11 @@ void nextStep(float timestep)
 		{
 			// Step 3
 			spring->computeSpringForces();
-			spring->addDamping();
+
+			if (g_iTestCase != 4)	// Don't apply damping for basic calculation in Demo1
+			{
+				spring->addDamping();
+			}
 		}
 
 		for each (auto point in points)
@@ -280,6 +296,7 @@ void nextStep(float timestep)
 			if (point->fixed){ continue; }
 
 			// Step 4
+			if (g_iTestCase == 7) { point->addGravity(); }
 			XMVECTOR totalForce = XMVectorAdd(point->ext_F, point->int_F);
 			point->vtmp = point->curr_v + half_timestep * (totalForce / point_mass);
 
@@ -290,7 +307,11 @@ void nextStep(float timestep)
 		{
 			// Step 6
 			spring->computeSpringForcesTMP();
-			spring->addDampingTMP();
+
+			if (g_iTestCase != 4)	// Don't apply damping for basic calculation in Demo1
+			{
+				spring->addDampingTMP();
+			}
 		}
 
 		for each(auto point in points) 
@@ -298,6 +319,8 @@ void nextStep(float timestep)
 			if (point->fixed) { continue; }
 			
 			// Step 7
+
+			if (g_iTestCase == 7) { point->addGravity(); }
 			XMVECTOR totalForce = XMVectorAdd(point->ext_F, point->int_F);
 			point->curr_v += half_timestep * (totalForce / point_mass);
 		}
@@ -309,12 +332,17 @@ void nextStep(float timestep)
 		for each (auto spring in springs)
 		{
 			spring->computeSpringForces();
-			spring->addDamping();
+
+			if (g_iTestCase != 4)	// Don't apply damping for basic calculation in Demo1
+			{
+				spring->addDamping();	
+			}
 		}
 		for each (auto point in points) 
 		{
 			if (point->fixed){ continue; }
 
+			if (g_iTestCase == 7) { point->addGravity(); }
 			XMVECTOR totalForce = XMVectorAdd(point->ext_F, point->int_F);
 
 			point->coords += XMVectorScale(point->curr_v, timestep);
@@ -328,9 +356,9 @@ void nextStep(float timestep)
 	{
 		if (point->fixed){ continue; }
 
-		if (XMVectorGetByIndex(point->coords, 2) < 0) 
+		if (XMVectorGetByIndex(point->coords, 1) < 0) 
 		{
-			XMVectorSetByIndex(point->coords, 0, 2);
+			XMVectorSetByIndex(point->coords, 0, 1);
 		}
 	}
 }
@@ -344,7 +372,7 @@ void InitTweakBar(ID3D11Device* pd3dDevice)
     g_pTweakBar = TwNewBar("TweakBar");
 	TwDefine(" TweakBar color='0 128 128' alpha=128 ");
 
-	TwType TW_TYPE_TESTCASE = TwDefineEnumFromString("Test Scene", "BasicTest,Setup1,Setup2,Setup3,Demo1");
+	TwType TW_TYPE_TESTCASE = TwDefineEnumFromString("Test Scene", "BasicTest,Setup1,Setup2,Setup3,Demo1,Demo2,Demo3,Demo4");
 	TwAddVarRW(g_pTweakBar, "Test Scene", TW_TYPE_TESTCASE, &g_iTestCase, "");
 	// HINT: For buttons you can directly pass the callback function as a lambda expression.
 	TwAddButton(g_pTweakBar, "Reset Scene", [](void *){g_iPreTestCase = -1; }, nullptr, "");
@@ -366,15 +394,41 @@ void InitTweakBar(ID3D11Device* pd3dDevice)
 	case 2:
 		TwAddVarRW(g_pTweakBar, "Draw Triangle", TW_TYPE_BOOLCPP, &g_bDrawTriangle, "");
 		break;
-	case 4:
-		TwAddVarRW(g_pTweakBar, "Midpoint", TW_TYPE_BOOLCPP, &g_bMidpoint, "");
+	case 5:
+	case 6:
 		TwAddVarRW(g_pTweakBar, "Draw Points", TW_TYPE_BOOLCPP, &g_bDrawPoints, "");
 		TwAddVarRW(g_pTweakBar, "Draw Springs", TW_TYPE_BOOLCPP, &g_bDrawSprings, "");
-		TwAddVarRW(g_pTweakBar, "Damping", TW_TYPE_FLOAT, &g_fDamping, "min=0.00 step=0.01");
+		TwAddVarRW(g_pTweakBar, "Damping", TW_TYPE_FLOAT, &g_fDamping, "min=0.00 step=0.2");
 		TwAddButton(g_pTweakBar, "Reset Simulation", [](void*)
 		{
 			massSpringInitialization();
 		}, nullptr, "");
+		break;
+	case 7:
+		TwAddVarRW(g_pTweakBar, "Midpoint", TW_TYPE_BOOLCPP, &g_bMidpoint, "");
+		TwAddVarRW(g_pTweakBar, "Draw Points", TW_TYPE_BOOLCPP, &g_bDrawPoints, "");
+		TwAddVarRW(g_pTweakBar, "Draw Springs", TW_TYPE_BOOLCPP, &g_bDrawSprings, "");
+		TwAddVarRW(g_pTweakBar, "Damping", TW_TYPE_FLOAT, &g_fDamping, "min=0.00 step=0.2");
+		TwAddVarRW(g_pTweakBar, "Gravity", TW_TYPE_BOOLCPP, &g_bGravityOn, "");
+		TwAddButton(g_pTweakBar, "Stiffness +10", [](void*)
+		{
+			for each(auto spring in springs) {
+				spring->stiffness += 10.f;
+			}
+			cout << "New stiffness at " << springs[0]->stiffness << "\n";
+		}, nullptr, "");
+		TwAddButton(g_pTweakBar, "Stiffness -10", [](void*)
+		{
+			for each(auto spring in springs) {
+				spring->stiffness -= 10.f;
+			}
+			cout << "New stiffness at " << springs[0]->stiffness << "\n";
+		}, nullptr, "");
+		TwAddButton(g_pTweakBar, "Reset Simulation", [](void*)
+		{
+			SpringHouseInitialization();
+		}, nullptr, "");
+		break;
 	default:
 		break;
 	}
@@ -606,6 +660,56 @@ void massSpringInitialization()
 
 	point_mass = 10.f;
 
+}
+
+void SpringHouseInitialization()
+{
+	// delete old points/springs
+	for each(auto point in points) { delete point; }
+	for each(auto spring in springs) { delete spring; }
+	points.clear();
+	springs.clear();
+
+	point* p0 = addPoint(0.f, 0.f, 0.f, false);
+	point* p1 = addPoint(0.f, 0.f, 2.f, false);
+	point* p2 = addPoint(2.f, 0.f, 2.f, false);
+	point* p3 = addPoint(2.f, 0.f, 0.f, false);
+
+	point* p4 = addPoint(0.f, 2.f, 0.f, false);
+	point* p5 = addPoint(0.f, 2.f, 2.f, false);
+	point* p6 = addPoint(2.f, 2.f, 2.f, false);
+	point* p7 = addPoint(2.f, 2.f, 0.f, false);
+
+	point* p8 = addPoint(0.f, 3.f, 1.f, true);
+	point* p9 = addPoint(2.f, 3.f, 1.f, false);
+
+	// some velocities
+	p1->curr_v = XMVectorSet(0.3f, 0.2f, 0.1f, 0.0f);
+	p6->curr_v = XMVectorSet(3.f, 0.f, 0.f, 0.f);
+
+	spring* s0 = addSpring(p0, p1, 40.f);
+	spring* s1 = addSpring(p1, p2, 40.f);
+	spring* s2 = addSpring(p2, p3, 40.f);
+	spring* s3 = addSpring(p3, p0, 40.f);
+
+	spring* s4 = addSpring(p1, p5, 2.f, 40.f);
+	spring* s5 = addSpring(p2, p6, 1.5f, 40.f);
+	spring* s6 = addSpring(p3, p7, 2.2f, 40.f);
+	spring* s7 = addSpring(p0, p4, 1.5f, 40.f);
+
+	spring* s8 = addSpring(p4, p5, 40.f);
+	spring* s9 = addSpring(p5, p6, 40.f);
+	spring* s10 = addSpring(p6, p7, 40.f);
+	spring* s11 = addSpring(p7, p4, 40.f);
+
+	spring* s12 = addSpring(p4, p8, 40.f);
+	spring* s13 = addSpring(p5, p8, 40.f);
+	spring* s14 = addSpring(p6, p9, 40.f);
+	spring* s15 = addSpring(p7, p9, 40.f);
+	
+	spring* s16 = addSpring(p8, p9, 40.f);
+
+	point_mass = 10.f;
 }
 
 //void DrawMassSpringSystem(ID3D11DeviceContext* pd3dImmediateContext)
@@ -942,7 +1046,55 @@ void CALLBACK OnFrameMove(double dTime, float fElapsedTime, void* pUserContext)
 			g_bDrawTriangle = true;
 			break;
 		case 4:
-			cout << "Demo 1!\n";
+			cout << "Demo 1\n";
+			
+			massSpringInitialization();
+			cout << "Points after one Euler Step\n";
+
+			g_bMidpoint = false; // use Euler method
+
+			nextStep(0.1f);
+
+			cout << "Position p0: (" << XMVectorGetByIndex(points[0]->coords, 0) << ", " << XMVectorGetByIndex(points[0]->coords, 1) << ", " << XMVectorGetByIndex(points[0]->coords, 2) << ")\n";
+			cout << "Position p1: (" << XMVectorGetByIndex(points[1]->coords, 0) << ", " << XMVectorGetByIndex(points[1]->coords, 1) << ", " << XMVectorGetByIndex(points[1]->coords, 2) << ")\n";
+
+			cout << "Velocity p0: (" << XMVectorGetByIndex(points[0]->curr_v, 0) << ", " << XMVectorGetByIndex(points[0]->curr_v, 1) << ", " << XMVectorGetByIndex(points[0]->curr_v, 2) << ")\n";
+			cout << "Velocity p1: (" << XMVectorGetByIndex(points[1]->curr_v, 0) << ", " << XMVectorGetByIndex(points[1]->curr_v, 1) << ", " << XMVectorGetByIndex(points[1]->curr_v, 2) << ")\n\n";
+
+			massSpringInitialization();
+			g_bMidpoint = true; // use midpoint method
+
+			nextStep(0.1f);
+
+			cout << "\nPoints after one midpoint Step\n";
+
+			cout << "Position p0: (" << XMVectorGetByIndex(points[0]->coords, 0) << ", " << XMVectorGetByIndex(points[0]->coords, 1) << ", " << XMVectorGetByIndex(points[0]->coords, 2) << ")\n";
+			cout << "Position p1: (" << XMVectorGetByIndex(points[1]->coords, 0) << ", " << XMVectorGetByIndex(points[1]->coords, 1) << ", " << XMVectorGetByIndex(points[1]->coords, 2) << ")\n";
+
+			cout << "Velocity p0: (" << XMVectorGetByIndex(points[0]->curr_v, 0) << ", " << XMVectorGetByIndex(points[0]->curr_v, 1) << ", " << XMVectorGetByIndex(points[0]->curr_v, 2) << ")\n";
+			cout << "Velocity p1: (" << XMVectorGetByIndex(points[1]->curr_v, 0) << ", " << XMVectorGetByIndex(points[1]->curr_v, 1) << ", " << XMVectorGetByIndex(points[1]->curr_v, 2) << ")\n\n";
+
+			
+			break;
+		case 5:
+			
+			massSpringInitialization();
+			g_bMidpoint = false;
+			h_timeStep = 0.005f;
+			
+			cout << "Demo 2\nEuler Method and timestep 0.005\n";
+			break;
+		case 6:
+
+			massSpringInitialization();
+			g_bMidpoint = true;
+			h_timeStep = 0.005f;
+
+			cout << "Demo3\nMidpoint Method and timestep 0.005\n";
+			break;
+		case 7:
+			cout << "Demo4\nSpringouse (10 points and 17 springs)\n";
+			SpringHouseInitialization();
 			break;
 		default:
 			cout << "Empty Test!\n";
@@ -991,7 +1143,9 @@ void CALLBACK OnFrameMove(double dTime, float fElapsedTime, void* pUserContext)
 		if (g_vfRotate.z > 2 * M_PI) g_vfRotate.z -= 2 * M_PI;
 
 		break;
-	case 4:
+	case 5:
+	case 6:
+	case 7:
 		time_counter += fElapsedTime;
 		if (time_counter > h_timeStep) 
 		{
@@ -1048,6 +1202,9 @@ void CALLBACK OnD3D11FrameRender( ID3D11Device* pd3dDevice, ID3D11DeviceContext*
 		if (g_bDrawTriangle) DrawTriangle(pd3dImmediateContext);
 		break;
 	case 4:
+	case 5:
+	case 6:
+	case 7:
 		// Draw Mass-Spring Setup
 		if (g_bDrawPoints) { drawPoints(pd3dImmediateContext); }
 		if (g_bDrawSprings) { drawSprings(pd3dImmediateContext); }
@@ -1114,8 +1271,6 @@ int main(int argc, char* argv[])
 	DXUTCreateWindow( L"Demo" );
 	DXUTCreateDevice( D3D_FEATURE_LEVEL_11_0, true, 1280, 960 );
 
-	massSpringInitialization();
-    
 	DXUTMainLoop(); // Enter into the DXUT render loop
 
 	DXUTShutdown(); // Shuts down DXUT (includes calls to OnD3D11ReleasingSwapChain() and OnD3D11DestroyDevice())
